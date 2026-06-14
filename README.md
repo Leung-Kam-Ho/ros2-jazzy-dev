@@ -1,115 +1,113 @@
 # jazzy-docker-cross
 
-ROS 2 Jazzy in a Docker container, cross-device communication ready (macOS + Windows).
+ROS 2 Jazzy in Docker (macOS/Docker Desktop) communicating with native ROS 2 on a Linux machine over LAN — fully offline, no cloud services.
+
+## Problem
+
+Docker Desktop for Mac runs containers inside a VM. Containers get private bridge IPs (e.g. 10.88.0.x) that are not directly routable from the LAN. DDS (the ROS 2 discovery protocol) embeds these private IPs in its locator messages, so even with port publishing (`-p`) the Linux side receives wrong addresses and cannot send data back.
+
+## Solution: WireGuard Sidecar
+
+A WireGuard container runs alongside your ROS containers, providing routable tunnel IPs (10.0.0.0/24). All ROS containers share the sidecar's network namespace, so DDS announces the correct tunnel address. The Linux machine connects as a WireGuard peer and communicates over the encrypted tunnel.
+
+```
+┌───────────────────── macOS ─────────────────────┐
+│                                                  │
+│  ┌──────────────────────────────────────────┐    │
+│  │        WireGuard Sidecar                  │    │
+│  │  ┌──────────┐  ┌────────────────────┐   │    │
+│  │  │   wg0    │  │ Discovery Server   │   │    │
+│  │  │ 10.0.0.1 │  │ UDP :11811         │   │    │
+│  │  └────▲─────┘  └────────────────────┘   │    │
+│  │       │                                   │    │
+│  │  ┌────┴─────┐  ┌────────────────────┐   │    │
+│  │  │ ROS Node │  │ ROS Node          │   │    │
+│  │  │ talker   │  │ listener          │   │    │
+│  │  └──────────┘  └────────────────────┘   │    │
+│  └──────────────────────────────────────────┘    │
+└───────────────────────┬──────────────────────────┘
+                        │ WireGuard tunnel :51820
+                        │
+┌───────────────────────┴──────────┐
+│         Linux (native ROS 2)     │
+│   wg0: 10.0.0.2                 │
+│   ROS_DISCOVERY_SERVER=10.0.0.1 │
+└──────────────────────────────────┘
+```
+
+ROS containers share the sidecar's network namespace. The discovery server also shares it and listens on `0.0.0.0:11811`. Linux sends discovery traffic to `10.0.0.1:11811` via WireGuard. All DDS data flows through the tunnel — no port publishing, no XML profiles, no NAT hacks needed.
 
 ## Files
 
 | File | Purpose |
-|------|---------|
-| `Dockerfile` | Builds the `r2_jazzy` image from `osrf/ros:jazzy-desktop` |
-| `run_r2_jazzy.sh` / `.bat` | Launches a container (macOS) with name, domain ID, and optional discovery server |
-| `run_r2_jazzy_linux.sh` | Launches a container (Linux) with host networking and optional discovery server |
-| `run_r2_jazzy_discovery_server.sh` / `.bat` | Starts a Fast DDS discovery server for cross-device communication |
-
-## Dockerfile
-
-- **Base:** `osrf/ros:jazzy-desktop`
-- **Adds:** `net-tools`, `neofetch`, `iputils-ping`
+|---|---|
+| `Dockerfile` | Builds `r2_jazzy` image from `osrf/ros:jazzy-desktop` |
+| `wg_setup.sh` | Generates WireGuard keys and configs (run once) |
+| `run_wireguard_sidecar.sh` | Starts the WireGuard sidecar (+ optional discovery server) |
+| `run_r2_jazzy.sh` | Launches a ROS container (WireGuard or local mode) |
 
 ## Usage
 
-### Build
+### 1. Build
 
 ```bash
 docker build -t r2_jazzy .
 ```
 
-### Local — multiple containers on the same machine
+### 2. Generate WireGuard keys
 
-Create the shared network once:
-
-```bash
-docker network create r2_jazzy_net
-```
-
-Launch containers:
+On the Mac:
 
 ```bash
-./run_r2_jazzy.sh talker 42
-./run_r2_jazzy.sh listener 42
+./wg_setup.sh
 ```
 
-Containers discover each other via the bridge network. Use the same `ROS_DOMAIN_ID` to share topics; different IDs isolate them.
+This creates `wg_config/` with keys and `wg0.conf` for the Mac sidecar (10.0.0.1).
 
-### Cross-device — containers on different machines
+Copy `wg_config/mac_public` to the Linux machine.
 
-Start the discovery server on the Mac:
+### 3. Start the sidecar
 
 ```bash
-./run_r2_jazzy_discovery_server.sh
+./run_wireguard_sidecar.sh --with-discovery
 ```
 
-Connect Docker containers from any machine:
+Starts the WireGuard container (UDP 51820) and a discovery server sharing its network.
 
-**macOS** (containers on bridge network):
-```bash
-./run_r2_jazzy.sh talker 42 192.168.1.100
-./run_r2_jazzy.sh listener 42 192.168.1.100
-```
-
-**Linux** (containers use `--network host`):
-```bash
-./run_r2_jazzy_linux.sh talker 42 192.168.1.100
-./run_r2_jazzy_linux.sh listener 42 192.168.1.100
-```
-
-The discovery server relays discovery traffic, so DDS multicast is not required.
-
-> **Why the discovery server IP is needed on macOS:** Docker Desktop containers live on a private bridge network (e.g., `172.17.0.x`) inside a VM. Other machines on the LAN cannot route to those addresses. The script generates a Fast DDS XML profile that makes containers advertise the Mac's LAN IP instead, and publishes the DDS ports so the Mac forwards traffic to the containers. Linux containers with `--network host` have no such limitation — they share the host's LAN IP directly.
-
-### Cross-device — native ROS 2 + Docker containers
-
-Connect a machine running ROS 2 natively (no Docker) to the same discovery server:
+### 4. Launch ROS containers
 
 ```bash
-export ROS_DISCOVERY_SERVER=192.168.1.100:11811
-export ROS_DOMAIN_ID=42
+# Terminal 1
+./run_r2_jazzy.sh talker 0
+
+# Terminal 2
+./run_r2_jazzy.sh listener 0
 ```
 
-The discovery server relays discovery between the native ROS 2 instance and Docker containers on any machine.
+Containers share the sidecar's network namespace. ROS_DISCOVERY_SERVER defaults to 127.0.0.1:11811.
 
-## Architecture
+### 5. Connect the Linux machine
 
+```bash
+# On the Linux machine (run as root)
+wg_setup.sh linux <MAC_LAN_IP>
+
+# Start WireGuard
+sudo wg-quick up wg0
+
+# Use ROS 2 natively
+export ROS_DISCOVERY_SERVER=10.0.0.1:11811
+export ROS_DOMAIN_ID=0
+ros2 run demo_nodes_cpp talker
 ```
-┌─────────────────────────────────────────────────────┐
-│                   macOS / Windows                   │
-│                                                     │
-│  ┌──────────────────────────────────────────────┐   │
-│  │          Docker Bridge Network               │   │
-│  │              r2_jazzy_net                    │   │
-│  │                                              │   │
-│  │  ┌──────────────┐     ┌──────────────┐       │   │
-│  │  │  r2_jazzy_A  │     │  r2_jazzy_B  │       │   │
-│  │  │ DOMAIN_ID=42 │◄───►│ DOMAIN_ID=42 │       │   │
-│  │  │ UDPv4 only   │     │ UDPv4 only   │       │   │
-│  │  └──────────────┘     └──────────────┘       │   │
-│  └──────────────────────────────────────────────┘   │
-│                                                     │
-│  ┌──────────────────────────────────────────────┐   │
-│  │  Cross-Device (optional):                    │   │
-│  │                                              │   │
-│  │  ┌──────────────────┐  UDP :11811            │   │
-│  │  │ Discovery Server │◄────────               │   │
-│  │  │ (fastdds)        │                        │   │
-│  │  └──────────────────┘                        │   │
-│  └──────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────┘
-         ▲                    ▲
-         │ UDP :11811         │ UDP :11811
-         │                    │
-  ┌──────────────┐    ┌──────────────┐
-  │ Other Device │    │ Other Device │
-  │ r2_jazzy_C   │    │ r2_jazzy_D   │
-  │ DOMAIN_ID=42 │    │ DOMAIN_ID=42 │
-  └──────────────┘    └──────────────┘
+
+The `wg_setup.sh linux` command generates a Linux config at `/etc/wireguard/wg0.conf`, creates the peer, and prints the `[Peer]` stanza to add to the Mac's `wg_config/wg0.conf`. Add it, then restart the sidecar.
+
+### Local testing (same machine, no WireGuard)
+
+```bash
+./run_r2_jazzy.sh talker 0 --local
+./run_r2_jazzy.sh listener 0 --local
 ```
+
+Uses a Docker bridge network (`r2_jazzy_net`) and SUBNET discovery. No sidecar needed.
