@@ -36,7 +36,7 @@ if [ "$WITH_DISCOVERY" = true ]; then
 fi
 
 echo ""
-echo "ROS containers (Mac): ./run_r2_jazzy.sh <name> <domain> 127.0.0.1"
+echo "ROS containers (Mac): ./run_r2_jazzy.sh <name> <domain> 10.0.0.1"
 echo "Linux native:         sudo wg-quick up wg0"
 echo "                     export ROS_DISCOVERY_SERVER=10.0.0.1:11811"
 echo "                     export ROS_DOMAIN_ID=0"
