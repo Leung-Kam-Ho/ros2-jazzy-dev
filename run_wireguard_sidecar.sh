@@ -21,7 +21,6 @@ docker run -d --rm \
     --cap-add SYS_MODULE \
     -v "$WG_DIR/wg0.conf:/config/wg0.conf:ro" \
     -p 51820:51820/udp \
-    --sysctl net.ipv4.conf.all.src_valid_mark=1 \
     linuxserver/wireguard
 
 echo "WireGuard sidecar started (tunnel IP: 10.0.0.1)"
@@ -33,16 +32,11 @@ if [ "$WITH_DISCOVERY" = true ]; then
         --network container:r2_jazzy_wireguard \
         r2_jazzy \
         fastdds discovery -i 0 -l 0.0.0.0 -p 11811
-    echo "Discovery server started (listening on 10.0.0.1:11811)"
-    echo ""
-    echo "ROS containers: ./run_r2_jazzy.sh <name> <domain> 10.0.0.1"
-    echo "Linux native:   export ROS_DISCOVERY_SERVER=10.0.0.1:11811"
-else
-    echo ""
-    echo "Start discovery server separately:"
-    echo "  docker run -d --rm --network container:r2_jazzy_wireguard r2_jazzy fastdds discovery -i 0 -l 0.0.0.0 -p 11811"
+    echo "Discovery server started (10.0.0.1:11811)"
 fi
 
 echo ""
-echo "Run ROS containers with: ./run_r2_jazzy.sh <name> <domain>"
-echo "Linux setup: sudo wg-quick up wg0 && export ROS_DISCOVERY_SERVER=10.0.0.1:11811"
+echo "ROS containers (Mac): ./run_r2_jazzy.sh <name> <domain> 127.0.0.1"
+echo "Linux native:         sudo wg-quick up wg0"
+echo "                     export ROS_DISCOVERY_SERVER=10.0.0.1:11811"
+echo "                     export ROS_DOMAIN_ID=0"
