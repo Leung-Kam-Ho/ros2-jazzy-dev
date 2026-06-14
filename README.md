@@ -60,7 +60,7 @@ We've organized the workflow into simple scripts for each platform:
 ├── windows/              # Scripts for Windows
 │   ├── 1_start_docker_env.bat
 │   ├── ...
-├── native_linux/         # Scripts for Native Linux
+├── linux/         # Scripts for Native Linux
 │   ├── 1_install_zenoh.sh
 │   ├── ...
 └── tests/                # High-frequency payload tests
@@ -87,15 +87,15 @@ We've organized the workflow into simple scripts for each platform:
 
 ## Step 2: Native Linux Setup
 
-Run the following scripts from the `native_linux` folder on your Linux machine:
+Run the following scripts from the `linux` folder on your Linux machine:
 
 1. **Install Zenoh** (Downloads the correct architecture binary: amd64 or arm64):
    ```bash
-   ./native_linux/1_install_zenoh.sh
+   ./linux/1_install_zenoh.sh
    ```
 2. **Start the Zenoh Bridge** (Keep this running in a terminal):
    ```bash
-   ./native_linux/2_start_zenoh_bridge.sh
+   ./linux/2_start_zenoh_bridge.sh
    ```
 
 ---
