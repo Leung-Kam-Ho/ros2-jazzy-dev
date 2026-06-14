@@ -11,6 +11,7 @@ echo "Discovery server running on $HOST_IP:11811"
 
 docker run -it --rm \
     --name r2_jazzy_discovery_server \
+    --network r2_jazzy_net \
     -p 11811:11811/udp \
     r2_jazzy \
     fastdds discovery -i 0 -l 0.0.0.0 -p 11811
