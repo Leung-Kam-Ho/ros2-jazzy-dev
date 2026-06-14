@@ -57,6 +57,17 @@ Connect containers from any machine on the LAN:
 
 The discovery server relays discovery traffic, so DDS multicast is not required.
 
+### Cross-device — native ROS 2 + Docker containers
+
+Connect a machine running ROS 2 natively (no Docker) to the same discovery server:
+
+```bash
+export ROS_DISCOVERY_SERVER=192.168.1.100:11811
+export ROS_DOMAIN_ID=42
+```
+
+The discovery server relays discovery between the native ROS 2 instance and the Docker containers on the Mac.
+
 ## Architecture
 
 ```
