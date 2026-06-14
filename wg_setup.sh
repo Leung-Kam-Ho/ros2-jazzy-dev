@@ -10,18 +10,22 @@ mkdir -p "$WG_DIR"
 
 gen_keys() {
     local label="$1"
+    mkdir -p "$WG_DIR"
     if [ -f "$WG_DIR/${label}_private" ]; then
         echo "  Keys for $label already exist"
         return
     fi
     echo "  Generating keys for $label..."
     docker pull -q linuxserver/wireguard > /dev/null 2>&1 || true
-    docker run --rm --entrypoint sh linuxserver/wireguard -c "
+    local tmp
+    tmp=$(docker run --rm --entrypoint sh linuxserver/wireguard -c "
         umask 077
         priv=\$(wg genkey)
         echo \"\$priv\"
         echo \"\$priv\" | wg pubkey
-    " 2>/dev/null | awk 'NR==1{print >"'$WG_DIR/${label}_private'"} NR==2{print >"'$WG_DIR/${label}_public'"}'
+    " 2>/dev/null)
+    echo "$tmp" | sed -n '1p' > "$WG_DIR/${label}_private"
+    echo "$tmp" | sed -n '2p' > "$WG_DIR/${label}_public"
     echo "  Keys saved"
 }
 
