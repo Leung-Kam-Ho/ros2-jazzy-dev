@@ -1,116 +1,112 @@
-# Cross-Platform ROS 2 (Jazzy) over Docker via Zenoh Bridge
+# Completely Offline Cross-Platform ROS 2 (Jazzy) via Zenoh
 
-This repository provides a seamless, 100% offline solution for running ROS 2 natively on Linux while communicating effortlessly with ROS 2 running inside Docker on macOS and Windows. 
+This repository solves the problem of connecting ROS 2 nodes running in Docker on Mac/Windows to Native Linux machines over a local network, **completely offline**, without Tailscale, VPNs, or complex DDS XML configurations.
 
-Because Docker on Mac and Windows runs inside a lightweight VM, DDS multicast discovery cannot escape to the physical Local Area Network (LAN). We solve this using **Zenoh**. The `zenoh-bridge-dds` plugin captures DDS traffic inside the Docker VM, funnels it through a standard TCP connection to the Linux machine, and converts it back to DDS.
+It bypasses Docker Desktop's lack of real bridge mode by tunneling DDS multicast traffic over standard TCP using `zenoh-bridge-dds`.
 
-## Architecture
+## Project Structure
 
-* **Device 1 (Linux - Native):** Acts as the central hub. Runs native ROS 2 Jazzy and a Zenoh bridge listening on a TCP port (`7447`).
-* **Device 2 (Mac - Docker):** Runs ROS 2 Jazzy in a container + a Zenoh bridge container that dials out to the Linux IP.
-* **Device 3 (Windows - Docker):** Runs ROS 2 Jazzy in a container + a Zenoh bridge container that dials out to the Linux IP.
+We've organized the workflow into simple scripts for each platform:
 
----
+```
+├── .env                  # Configuration (Linux IP, Domain ID)
+├── docker-compose.yml    # Docker setup for Mac/Windows
+├── Dockerfile            # ROS 2 Jazzy image definition
+├── mac/                  # Scripts for MacOS
+│   ├── 1_start_docker_env.sh
+│   ├── 2_run_talker.sh
+│   ├── 3_run_listener.sh
+│   └── 4_stop_docker_env.sh
+├── windows/              # Scripts for Windows
+│   ├── 1_start_docker_env.bat
+│   ├── 2_run_talker.bat
+│   ├── 3_run_listener.bat
+│   └── 4_stop_docker_env.bat
+└── native_linux/         # Scripts for Native Linux
+    ├── 1_install_zenoh.sh
+    ├── 2_start_zenoh_bridge.sh
+    ├── 3_run_talker.sh
+    └── 4_run_listener.sh
+```
 
-## Step 1: Set up the Native Linux Machine (The Hub)
+## How It Works
 
-On your physical Linux machine, you need to install the Zenoh DDS bridge and start it in "Listen" mode.
-
-1. **Install ROS 2 Jazzy** natively (if not already installed).
-2. **Install Zenoh DDS Bridge:**
-   Depending on your Linux architecture, download the correct pre-compiled binary:
-
-   **For x86_64 (Intel/AMD) Linux:**
-   ```bash
-   curl -L https://github.com/eclipse-zenoh/zenoh-plugin-dds/releases/latest/download/zenoh-plugin-dds-1.9.0-x86_64-unknown-linux-gnu-standalone.zip -o zenoh-bridge.zip
-   unzip zenoh-bridge.zip
-   sudo mv zenoh-bridge-dds /usr/local/bin/
-   ```
-
-   **For aarch64/ARM64 Linux (e.g., Ubuntu in UTM on Apple Silicon, Raspberry Pi):**
-   ```bash
-   curl -L https://github.com/eclipse-zenoh/zenoh-plugin-dds/releases/latest/download/zenoh-plugin-dds-1.9.0-aarch64-unknown-linux-gnu-standalone.zip -o zenoh-bridge.zip
-   unzip zenoh-bridge.zip
-   sudo mv zenoh-bridge-dds /usr/local/bin/
-   ```
-   *(Alternatively, you can install via `cargo install zenoh-bridge-dds` if you have Rust installed).*
-
-3.    **Start the Bridge:**
-   Open a terminal and run the bridge. The bridge will run in standard peer mode and listen for incoming connections. We use `-a ".*"` to ensure *all* ROS 2 topics are explicitly allowed and routed.
-   ```bash
-   export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-   zenoh-bridge-dds -l tcp/0.0.0.0:7447 -a ".*"
-   ```
-
-4. **Find the Linux Machine's LAN IP:**
-   ```bash
-   ip addr
-   ```
-   *Note this IP down (e.g., `192.168.1.100`). You will need it for the Mac and Windows setups.*
+1. **Native Linux** acts as the server. It runs the standalone `zenoh-bridge-dds` binary, listening on TCP port `7447`. It captures all local DDS multicast traffic and forwards it.
+2. **Mac / Windows Docker** acts as the client. Docker Compose starts a ROS 2 container (`network_mode: "host"`) alongside a Zenoh Bridge container. The bridge connects *out* of the Docker VM to the Linux machine's IP, tunneling the DDS traffic.
+3. Both sides are forced to use `RMW_IMPLEMENTATION=rmw_fastrtps_cpp` to ensure 100% vendor compatibility.
 
 ---
 
-## Step 2: Set up Mac and Windows (Docker)
+## Step 1: Initial Setup (All Platforms)
 
-On both your Mac and Windows machines, you will use the provided `docker-compose.yml` file.
-
-1. **Clone/Copy this repository** to your Mac and Windows machines.
-2. **Configure the IP Address:**
-   Rename `.env.example` to `.env` and insert your Linux machine's IP address.
+1. Clone this repository.
+2. Copy the `.env.example` file to `.env`:
    ```bash
    cp .env.example .env
    ```
-   Edit `.env` (using VS Code, nano, notepad, etc.):
-   ```env
-   LINUX_IP=192.168.1.100  # <--- Change this to your Linux IP!
-   ROS_DOMAIN_ID=0
-   ```
-
-3. **Start the Docker Containers:**
-   In the directory containing `docker-compose.yml`, run:
-   ```bash
-   docker compose up -d
-   ```
-   *This starts the `ros2_jazzy_node` container in the background alongside the `ros2_zenoh_bridge` sidecar.*
+3. Open `.env` and replace `192.168.x.x` with the actual **Local IPv4 Address of your Native Linux machine**.
 
 ---
 
-## Step 3: Test the Communication!
+## Step 2: Native Linux Setup
 
-Now let's verify that a ROS 2 Topic is visible across all three operating systems.
+Run the following scripts from the `native_linux` folder on your Linux machine:
 
-### 1. Start a Talker on Linux (Native)
-Open a new terminal on your Linux machine, source ROS 2, and start publishing:
+1. **Install Zenoh** (Downloads the correct architecture binary: amd64 or arm64):
+   ```bash
+   ./native_linux/1_install_zenoh.sh
+   ```
+2. **Start the Zenoh Bridge** (Keep this running in a terminal):
+   ```bash
+   ./native_linux/2_start_zenoh_bridge.sh
+   ```
+
+---
+
+## Step 3: Mac or Windows Setup
+
+Open a terminal (Mac) or Command Prompt/PowerShell (Windows) and run the scripts in your respective folder.
+
+### On Mac:
+1. Start the Docker environment:
+   ```bash
+   ./mac/1_start_docker_env.sh
+   ```
+
+### On Windows:
+1. Start the Docker environment:
+   ```cmd
+   windows\1_start_docker_env.bat
+   ```
+
+---
+
+## Step 4: Testing Bidirectional Communication
+
+You can test communication in both directions using the provided scripts.
+
+**Test 1: Mac/Windows Talker ➡️ Linux Listener**
+1. On Linux, run: `./native_linux/4_run_listener.sh`
+2. On Mac, run: `./mac/2_run_talker.sh` (or `windows\2_run_talker.bat` on Windows)
+3. You should see `Hello World` appearing on the Linux listener!
+
+**Test 2: Linux Talker ➡️ Mac/Windows Listener**
+1. On Mac, run: `./mac/3_run_listener.sh` (or `windows\3_run_listener.bat` on Windows)
+2. On Linux, run: `./native_linux/3_run_talker.sh`
+3. You should see `Hello World` appearing on the Mac/Windows listener!
+
+---
+
+## Step 5: Shutting Down
+
+When you are finished, gracefully stop your Docker containers.
+
+**On Mac:**
 ```bash
-source /opt/ros/jazzy/setup.bash
-ros2 run demo_nodes_cpp talker
+./mac/4_stop_docker_env.sh
 ```
 
-### 2. Check the Mac (Docker)
-Open a terminal on your Mac, drop into the running ROS 2 container, and look for the topic:
-```bash
-# Exec into the running ROS 2 container
-docker exec -it ros2_jazzy_node bash
-
-# Inside the container, source ROS 2
-source /opt/ros/jazzy/setup.bash
-
-# List the topics to prove discovery works!
-ros2 topic list
-
-# Listen to the messages
-ros2 run demo_nodes_cpp listener
+**On Windows:**
+```cmd
+windows\4_stop_docker_env.bat
 ```
-*You should see "I heard: [Hello World: X]" pouring in from the Linux machine.*
-
-### 3. Check the Windows (Docker)
-Repeat the exact same steps on Windows:
-```powershell
-docker exec -it ros2_jazzy_node bash
-source /opt/ros/jazzy/setup.bash
-ros2 run demo_nodes_cpp listener
-```
-
-## Bonus: Bidirectional Communication
-Because the Zenoh bridge maps the DDS layer perfectly, this works in **any** direction. 
-Try stopping the talker on Linux, and start it inside the Mac Docker container instead (`ros2 run demo_nodes_cpp talker`). Then run the `listener` on Linux and Windows. It will work flawlessly without any routing/NAT configuration!
