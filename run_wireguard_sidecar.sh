@@ -35,7 +35,7 @@ if [ "$WITH_DISCOVERY" = true ]; then
         fastdds discovery -i 0 -l 0.0.0.0 -p 11811
     echo "Discovery server started (listening on 10.0.0.1:11811)"
     echo ""
-    echo "ROS containers: ./run_r2_jazzy.sh <name> <domain> 127.0.0.1"
+    echo "ROS containers: ./run_r2_jazzy.sh <name> <domain> 10.0.0.1"
     echo "Linux native:   export ROS_DISCOVERY_SERVER=10.0.0.1:11811"
 else
     echo ""

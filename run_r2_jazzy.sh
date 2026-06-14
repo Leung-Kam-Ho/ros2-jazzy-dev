@@ -3,7 +3,7 @@ set -euo pipefail
 
 NAME=${1:-r2_jazzy}
 DOMAIN_ID=${2:-0}
-DISCOVERY_SERVER=${3:-127.0.0.1}
+DISCOVERY_SERVER=${3:-10.0.0.1}
 LOCAL=false
 
 for arg in "$@"; do
@@ -23,11 +23,13 @@ if [ "$LOCAL" = true ]; then
 else
     echo "Starting '$NAME' (WireGuard mode, domain $DOMAIN_ID)"
     echo "  Discovery server: $DISCOVERY_SERVER:11811"
+
     docker run -it --rm \
         --name "$NAME" \
         --network container:r2_jazzy_wireguard \
         -e DISPLAY=host.docker.internal:0 \
         -e ROS_DOMAIN_ID="$DOMAIN_ID" \
         -e ROS_DISCOVERY_SERVER="$DISCOVERY_SERVER:11811" \
+        -e FASTDDS_BUILTIN_TRANSPORTS=UDPv4 \
         r2_jazzy
 fi
