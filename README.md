@@ -26,7 +26,7 @@ What we have built in this repository is significantly more elegant than the sta
 |             ^                                               |
 |             | (Local DDS Multicast)                         |
 |             v                                               |
-|  [ zenoh-bridge-ros2dds (TCP :7447) ] <==================+  |
+|  [ zenoh-bridge-ros2dds (Listen TCP :7447) ] <===========+  |
 +----------------------------------------------------------|--+
                                                            |
                       (TCP Tunnel bypasses Docker Network Isolation)
@@ -42,7 +42,7 @@ What we have built in this repository is significantly more elegant than the sta
 |  |          ^                                         |  |  |
 |  |          | (Local DDS Multicast)                   |  |  |
 |  |          v                                         |  |  |
-|  |  [ zenoh-bridge-ros2dds Client Container ] =========>===+
+|  |  [ zenoh-bridge-ros2dds (Connect to Linux IP) ] ====>===+
 |  +----------------------------------------------------+  |
 +-------------------------------------------------------------+
 ```
@@ -53,6 +53,8 @@ We've organized the workflow into simple scripts for each platform:
 
 ```text
 ├── .env                  # Configuration (Linux IP, Domain ID)
+├── zenoh_config.json     # Performance tuning for Zenoh
+├── fastdds_tuning.xml    # Performance tuning for ROS 2 (FastDDS)
 ├── docker-compose.yml    # Docker setup for Mac/Windows
 ├── Dockerfile            # ROS 2 Jazzy image definition
 ├── mac/                  # Scripts for MacOS
@@ -66,14 +68,16 @@ We've organized the workflow into simple scripts for each platform:
 │   ├── ...
 └── tests/                # High-frequency payload tests
     ├── blob_talker.py    # Custom throughput benchmark
+    ├── speed_monitor.py  # Real-time performance monitor
     └── ...
 ```
 
 ## How It Works
 
-1. **Native Linux** acts as the server. It runs the standalone `zenoh-bridge-ros2dds` binary, listening on TCP port `7447`. It captures all local DDS multicast traffic and forwards it.
-2. **Mac / Windows Docker** acts as the client. Docker Compose starts a ROS 2 container (`network_mode: "host"`) alongside a Zenoh Bridge container. The bridge connects *out* of the Docker VM to the Linux machine's IP, tunneling the DDS traffic.
-3. Both sides are forced to use `RMW_IMPLEMENTATION=rmw_fastrtps_cpp` to ensure 100% vendor compatibility.
+1. **Native Linux** acts as the server (Peer). It runs the standalone `zenoh-bridge-ros2dds` binary, listening on TCP port `7447`. It captures all local DDS multicast traffic and routes it to any connected clients.
+2. **Mac / Windows Docker** acts as the client. Docker Compose starts a ROS 2 container (`network_mode: "host"`) alongside a Zenoh Bridge container. The bridge connects *out* of the Docker VM to the Linux machine's IP, establishing the tunnel.
+3. **Optimized Transport**: Both sides are tuned to handle large fragments and high-frequency bursts (via `fastdds_tuning.xml` and `net.core` buffer increases).
+4. Both sides are forced to use `RMW_IMPLEMENTATION=rmw_fastrtps_cpp` to ensure 100% vendor compatibility.
 
 ---
 
