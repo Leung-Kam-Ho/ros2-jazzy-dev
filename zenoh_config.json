@@ -1,10 +1,7 @@
 {
   "transport": {
     "unicast": {
-      "lowlatency": true,
-      "tcp": {
-        "no_delay": true
-      }
+      "lowlatency": true
     }
   }
 }
