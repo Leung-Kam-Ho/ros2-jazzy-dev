@@ -15,3 +15,4 @@
 *.so
 linux/zenoh-bridge-dds
 *.zip
+linux/zenoh-bridge-ros2dds
