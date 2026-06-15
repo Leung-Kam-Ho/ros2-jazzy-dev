@@ -139,6 +139,16 @@ You can test communication in both directions using the provided scripts.
 2. On Linux, run: `./linux/3_run_talker.sh`
 3. You should see `Hello World` appearing on the Mac/Windows listener!
 
+### System in Action
+
+Below are screenshots showing the bridge in action across platforms.
+
+**Mac Docker communicating with Native Linux ROS 2:**
+![Mac Docker Communication](assets/mac_docker.png)
+
+**Zenoh Bridge running and ROS 2 topics on Native Linux:**
+![Linux Native Bridge and Topics](assets/linux_native.png)
+
 ---
 
 ## Step 5: Throughput Benchmarking
