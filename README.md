@@ -4,19 +4,17 @@ This repository solves the problem of connecting ROS 2 nodes running in Docker o
 
 It bypasses Docker Desktop's lack of real bridge mode by tunneling DDS multicast traffic over standard TCP using `zenoh-bridge-ros2dds`.
 
+### System in Action
+
+**Mac Docker communicating with Native Linux ROS 2:**
+![Mac Docker Communication](assets/mac_docker.png)
+
+**Zenoh Bridge running and ROS 2 topics on Native Linux:**
+![Linux Native Bridge and Topics](assets/linux_native.png)
+
+---
+
 ## System Architecture
-
-## Why This Zenoh Solution is Better
-
-If you have researched this problem online, you likely found the standard workarounds: writing complex `fastdds.xml` profiles, hardcoding IP addresses for Discovery Servers, or relying on Windows 11's WSL Mirrored Mode (which doesn't work on Mac && you will face some issues with ros2 daemon). 
-
-What we have built in this repository is significantly more elegant than the standard community workarounds:
-
-1. **Zero XML Configuration:** No messing with `fastdds.xml` or custom ROS 2 profiles.
-2. **True Plug-and-Play:** You don't have to change how ROS 2 behaves. It still uses standard UDP multicast *inside* the local environments. Zenoh just silently grabs it and moves it across the network.
-3. **Cross-Platform Parity:** It works exactly the same way on Mac, Windows, and Linux. No platform-specific hacks required.
-4. **TCP Reliability:** Instead of relying on UDP packets making it across a noisy WiFi network, the bridge uses a solid TCP tunnel (`tcp/0.0.0.0:7447`) to guarantee message delivery.
-5. **Modern ROS 2 Support:** Uses the newer `zenoh-bridge-ros2dds` which is optimized specifically for ROS 2 discovery and traffic.
 
 ```text
 +-------------------------------------------------------------+
@@ -46,6 +44,8 @@ What we have built in this repository is significantly more elegant than the sta
 |  +----------------------------------------------------+  |
 +-------------------------------------------------------------+
 ```
+
+## Why This Zenoh Solution is Better
 
 ## Project Structure
 
@@ -138,16 +138,6 @@ You can test communication in both directions using the provided scripts.
 1. On Mac, run: `./mac/3_run_listener.sh` (or `windows\3_run_listener.bat` on Windows)
 2. On Linux, run: `./linux/3_run_talker.sh`
 3. You should see `Hello World` appearing on the Mac/Windows listener!
-
-### System in Action
-
-Below are screenshots showing the bridge in action across platforms.
-
-**Mac Docker communicating with Native Linux ROS 2:**
-![Mac Docker Communication](assets/mac_docker.png)
-
-**Zenoh Bridge running and ROS 2 topics on Native Linux:**
-![Linux Native Bridge and Topics](assets/linux_native.png)
 
 ---
 
