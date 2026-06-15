@@ -10,3 +10,8 @@
 
 # Docker
 .dockerignore
+
+
+*.so
+linux/zenoh-bridge-dds
+*.zip
