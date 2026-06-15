@@ -8,4 +8,4 @@ fi
 
 echo "Starting Zenoh ROS2 Bridge on Native Linux (Listening on TCP 7447)..."
 export RUST_LOG=info
-./zenoh-bridge-ros2dds --listen tcp/0.0.0.0:7447 peer --config '{"transport":{"unicast":{"lowlatency":true,"tcp":{"no_delay":true}}}}'
+./zenoh-bridge-ros2dds --listen tcp/0.0.0.0:7447 peer --config ../zenoh_config.json
