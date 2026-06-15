@@ -8,4 +8,4 @@ fi
 
 echo "Starting Zenoh ROS2 Bridge on Native Linux (Listening on TCP 7447)..."
 export RUST_LOG=info
-./zenoh-bridge-ros2dds -l tcp/0.0.0.0:7447
+./zenoh-bridge-ros2dds -l tcp/0.0.0.0:7447 --allow '.*'
